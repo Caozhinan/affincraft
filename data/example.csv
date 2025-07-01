@@ -1,0 +1,3 @@
+receptor,ligand,name,pk,rmsd
+/xcfhome/zncao02/dataset_bap/test_set/custom/6uux-QHM/protein.pdb,/xcfhome/zncao02/dataset_bap/test_set/custom/6uux-QHM/ligand.sdf,6uux-QHM,6.63,1.25
+

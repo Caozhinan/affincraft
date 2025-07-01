@@ -2,7 +2,7 @@ import argparse  # 命令行参数解析
 from pathlib import Path  # 跨平台路径对象
 from tqdm import tqdm  # 进度条（本脚本未用到）
 import pickle  # 对象序列化/反序列化
-from preprocess import gen_feature, gen_graph, to_pyg_graph, get_info, RF_score, GB_score, GetECIF  # 自定义化学特征/图处理函数
+from preprocess import gen_feature, gen_graph, to_pyg_graph, get_info, RF_score, GB_score, GetECIF, analyze_plip_interactions  # 自定义化学特征/图处理函数
 from joblib import Parallel, delayed  # 并行处理
 from utils import read_mol, obabel_pdb2mol, pymol_pocket, correct_sanitize_v2  # 分子文件处理工具
 import numpy as np  # 数值处理
@@ -13,60 +13,73 @@ import os  # 操作系统相关，如文件删除
 
 
 # 多线程单个样本处理主函数
-def parallel_helper(proteinpdb, ligandsdf, name_prefix, mol, pdict, protein_cutoff, pocket_cutoff, spatial_cutoff):
-    RDLogger.DisableLog('rdApp.*')  # 关闭 RDKit 日志输出，防止多线程干扰
-    # 创建临时文件用于中间数据保存
-    _, templigand = tempfile.mkstemp(suffix='.sdf')  # 临时配体 sdf
-    os.close(_)  # 关闭文件描述符
-    _, temppocketpdb = tempfile.mkstemp(suffix='.pdb')  # 临时 pocket pdb
-    os.close(_)
-    _, temppocketsdf = tempfile.mkstemp(suffix='.sdf')  # 临时 pocket sdf
-    os.close(_)
-    pymol_pocket(proteinpdb, ligandsdf, temppocketpdb)  # 用 pymol 选出 pocket 区域保存为 pdb
-    obabel_pdb2mol(temppocketpdb, temppocketsdf)  # 用 openbabel 转为 sdf 格式
-    assert "_Name" in pdict, f'Property dict should have _Name key, but currently: {pdict}'  # 检查分子属性有名字
-    name = name_prefix + f'_{pdict["_Name"]}'  # 生成唯一名字
-    try:
-        ligand = correct_sanitize_v2(mol)  # RDKit 分子消毒修正
-        Chem.MolToMolFile(ligand, templigand)  # 保存修正结果为 sdf
-        pocket = read_mol(temppocketsdf)  # 读取 pocket 分子
-        proinfo, liginfo = get_info(proteinpdb, templigand)  # 获取蛋白与配体信息（如原子坐标、类型等）
-        res = gen_feature(ligand, pocket, name)  # 生成结构特征（如原子、键、环境等）
-        # 机器学习相关评分特征
-        res['rfscore'] = RF_score(liginfo, proinfo)  # 随机森林打分
-        res['gbscore'] = GB_score(liginfo, proinfo)  # 梯度提升树打分
-        res['ecif'] = np.array(GetECIF(str(proteinpdb), str(templigand)))  # ECIF 特征（原子对计数）
-    except RuntimeError as e:
-        # 只要分子读入失败就报错并返回 None
-        print(proteinpdb, temppocketsdf, templigand, "Fail on reading molecule")
-        return None
-
-    # 提取配体与 pocket 特征（如原子类别、坐标、环境等，作为图节点/边属性）
-    ligand = (res['lc'], res['lf'], res['lei'], res['lea'])
-    pocket = (res['pc'], res['pf'], res['pei'], res['pea'])
-
-    # 生成分子复合物图，异常时跳过
-    try:
-        raw = gen_graph(
-            ligand, pocket, name, 
-            protein_cutoff=protein_cutoff,
-            pocket_cutoff=pocket_cutoff,
-            spatial_cutoff=spatial_cutoff
-        )  # 生成原始图结构特征（如邻接、节点、边等），cutoff 控制边界
-    except ValueError as e:
-        print(f"{name}: Error gen_graph from raw feature {str(e)}")
-        return None
-
-    # 转换为 PyTorch Geometric 图数据结构，并加上全局特征
-    graph = to_pyg_graph(
-        list(raw) + [res['rfscore'], res['gbscore'], res['ecif'], -1, name], 
-        frame=-1, rmsd_lig=0.0, rmsd_pro=0.0
-    )
-
-    # 清理所有临时文件，防止磁盘爆满
-    os.remove(templigand)
-    os.remove(temppocketpdb)
-    os.remove(temppocketsdf)
+def parallel_helper(proteinpdb, ligandsdf, name_prefix, mol, pdict, protein_cutoff, pocket_cutoff, spatial_cutoff):  
+    RDLogger.DisableLog('rdApp.*')  # 关闭 RDKit 日志输出，防止多线程干扰  
+    # 创建临时文件用于中间数据保存  
+    _, templigand = tempfile.mkstemp(suffix='.sdf')  # 临时配体 sdf  
+    os.close(_)  # 关闭文件描述符  
+    _, temppocketpdb = tempfile.mkstemp(suffix='.pdb')  # 临时 pocket pdb  
+    os.close(_)  
+    _, temppocketsdf = tempfile.mkstemp(suffix='.sdf')  # 临时 pocket sdf  
+    os.close(_)  
+      
+    pymol_pocket(proteinpdb, ligandsdf, temppocketpdb)  # 用 pymol 选出 pocket 区域保存为 pdb  
+    obabel_pdb2mol(temppocketpdb, temppocketsdf)  # 用 openbabel 转为 sdf 格式  
+    assert "_Name" in pdict, f'Property dict should have _Name key, but currently: {pdict}'  # 检查分子属性有名字  
+    name = name_prefix + f'_{pdict["_Name"]}'  # 生成唯一名字  
+      
+    try:  
+        ligand = correct_sanitize_v2(mol)  # RDKit 分子消毒修正  
+        Chem.MolToMolFile(ligand, templigand)  # 保存修正结果为 sdf  
+        pocket = read_mol(temppocketsdf)  # 读取 pocket 分子  
+        proinfo, liginfo = get_info(proteinpdb, templigand)  # 获取蛋白与配体信息（如原子坐标、类型等）  
+        res = gen_feature(ligand, pocket, name)  # 生成结构特征（如原子、键、环境等）  
+          
+        # 机器学习相关评分特征  
+        res['rfscore'] = RF_score(liginfo, proinfo)  # 随机森林打分  
+        res['gbscore'] = GB_score(liginfo, proinfo)  # 梯度提升树打分  
+        res['ecif'] = np.array(GetECIF(str(proteinpdb), str(templigand)))  # ECIF 特征（原子对计数）  
+          
+        # 新增：PLIP相互作用分析  
+        print(f"正在进行PLIP分析: {name}")  
+        plip_interactions = analyze_plip_interactions(str(proteinpdb), str(templigand))  
+        res['plip_interactions'] = plip_interactions  
+          
+    except RuntimeError as e:  
+        # 只要分子读入失败就报错并返回 None  
+        print(proteinpdb, temppocketsdf, templigand, "Fail on reading molecule")  
+        return None  
+  
+    # 提取配体与 pocket 特征（如原子类别、坐标、环境等，作为图节点/边属性）  
+    ligand = (res['lc'], res['lf'], res['lei'], res['lea'])  
+    pocket = (res['pc'], res['pf'], res['pei'], res['pea'])  
+  
+    # 生成分子复合物图，异常时跳过  
+    try:  
+        # 修改：传递PLIP分析结果和文件路径给gen_graph  
+        raw = gen_graph(  
+            ligand, pocket, name,   
+            protein_cutoff=protein_cutoff,  
+            pocket_cutoff=pocket_cutoff,  
+            spatial_cutoff=spatial_cutoff,  
+            protein_file=str(proteinpdb),  
+            ligand_file=str(templigand),  
+            plip_interactions=res['plip_interactions']  
+        )  # 生成原始图结构特征（如邻接、节点、边等），cutoff 控制边界  
+    except ValueError as e:  
+        print(f"{name}: Error gen_graph from raw feature {str(e)}")  
+        return None  
+  
+    # 转换为 PyTorch Geometric 图数据结构，并加上全局特征  
+    graph = to_pyg_graph(  
+        list(raw) + [res['rfscore'], res['gbscore'], res['ecif'], -1, name],   
+        frame=-1, rmsd_lig=0.0, rmsd_pro=0.0  
+    )  
+  
+    # 清理所有临时文件，防止磁盘爆满  
+    os.remove(templigand)  
+    os.remove(temppocketpdb)  
+    os.remove(temppocketsdf)  
     return graph  # 返回该分子复合物的图对象
 
 # 并行批量处理复合物
