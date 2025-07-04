@@ -292,11 +292,22 @@ class MaSIF_ppi_search:
                 )
 
                 # Refine global_desc with a FC layer.
-                self.global_desc = tf.keras.layers.Dense(  
-                    units=self.n_thetas * self.n_rhos, # 明确指定 units  
-                    activation=tf.identity,  
-                )(self.global_desc)  
-                # batch_size, n_thetas
+                W_fc = tf.compat.v1.get_variable(  
+                    "fully_connected/weights",  # 匹配checkpoint中的名称  
+                    shape=[self.n_thetas * self.n_rhos * self.n_feat, self.n_thetas * self.n_rhos],  
+                    initializer=tf.keras.initializers.GlorotUniform(),  
+                )  
+                b_fc = tf.compat.v1.get_variable(  
+                    "fully_connected/biases",  # 匹配checkpoint中的名称  
+                    shape=[self.n_thetas * self.n_rhos],  
+                    initializer=tf.zeros_initializer(),  
+                )  
+                self.global_desc = tf.matmul(self.global_desc, W_fc) + b_fc    
+
+
+
+                
+
 
                 # compute data loss
                 self.n_patches = tf.shape(self.global_desc)[0] // 4

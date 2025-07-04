@@ -98,6 +98,7 @@ def computeHydrophobicity(names, ligand_code=None, rdmol=None):
             atom_name = name.split("_")[4]  
             hp[ix] = mol_kd.get(atom_name, 0.0)  # 使用get避免KeyError  
         else:  
-            hp[ix] = kd_scale[aa]  
+            # 为未知残基类型添加默认值  
+            hp[ix] = kd_scale.get(aa, 0.0)
       
     return hp

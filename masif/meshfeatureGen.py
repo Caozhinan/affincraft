@@ -7,7 +7,7 @@ from Bio.PDB import *
 import sys  
 import importlib  
 from IPython.core.debugger import set_trace  
-  
+import argparse
 # 本地导入  
 from default_config.masif_opts import masif_opts  
 from triangulation.computeMSMS import computeMSMS  
@@ -249,38 +249,22 @@ def compute_protein_ligand_surface_features(pdb_file, chain_id, ligand_code=None
     return enhanced_features  
   
 # 使用示例  
-if __name__ == "__main__":  
-    # 示例：处理蛋白质-配体复合物  
+if __name__ == "__main__":    
+    parser = argparse.ArgumentParser()  
+    parser.add_argument('--pdb_file', required=True)  
+    parser.add_argument('--chain_id', required=True)  
+    parser.add_argument('--ligand_code', default=None)  
+    parser.add_argument('--ligand_chain', default=None)  
+    parser.add_argument('--sdf_file', default=None)  
+    parser.add_argument('--output_dir', required=True)  
+      
+    args = parser.parse_args()  
+      
     result = compute_protein_ligand_surface_features(  
-        pdb_file="complex.pdb",  
-        chain_id="A",   
-        ligand_code="UNK",  
-        ligand_chain="X",  # 现在主要用于命名  
-        sdf_file="ligand.sdf",  # 现在是必需的  
-        output_dir="./output"  
+        pdb_file=args.pdb_file,  
+        chain_id=args.chain_id,  
+        ligand_code=args.ligand_code,  
+        ligand_chain=args.ligand_chain,  
+        sdf_file=args.sdf_file,  
+        output_dir=args.output_dir  
     )
-      
-    print("\n=== 输出特征总结 ===")  
-    print("几何特征:")  
-    print(f"  - 顶点: {result['vertices'].shape}")  
-    print(f"  - 面: {result['faces'].shape}")  
-    print(f"  - 法向量: {result['normals'].shape}")  
-      
-    print("化学特征:")  
-    print(f"  - 静电势: {result['charges'].shape}")  
-    print(f"  - 氢键: {result['hbond'].shape}")  
-    print(f"  - 疏水性: {result['hydrophobicity'].shape}")  
-      
-    print("形状特征:")  
-    print(f"  - 形状指数: {result['shape_index'].shape}")  
-    print(f"  - 平均曲率: {result['mean_curvature'].shape}")  
-    print(f"  - 高斯曲率: {result['gaussian_curvature'].shape}")  
-      
-    print(f"\nPLY文件保存在: {result['ply_file']}")  
-      
-    # 示例2：仅处理蛋白质（无配体）  
-    # protein_only_result = compute_protein_ligand_surface_features(  
-    #     pdb_file="protein_only.pdb",  
-    #     chain_id="A",  
-    #     output_dir="./output"  
-    # )

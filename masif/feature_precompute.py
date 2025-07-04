@@ -139,35 +139,16 @@ def load_precomputed_features(precomp_dir, ppi_pair_id='p1'):
   
 # 使用示例  
 if __name__ == "__main__":  
-    # 示例：对Step 1和2的输出进行特征预计算  
-    ply_file = "./output/tmp/complex_A.ply"  # Step 1和2的输出  
-    output_dir = "./output"  
+    import argparse  
+    parser = argparse.ArgumentParser()  
+    parser.add_argument('--ply_file', required=True)  
+    parser.add_argument('--output_dir', required=True)  
+    parser.add_argument('--masif_app', default='masif_site')  
       
-    # 执行Step 3  
+    args = parser.parse_args()  
+      
     features = precompute_surface_features(  
-        ply_file_path=ply_file,  
-        output_dir=output_dir,  
-        masif_app='masif_site'  
-    )  
-      
-    if features is not None:  
-        print("\n=== Step 3 输出特征总结 ===")  
-        print(f"输入特征矩阵: {features['input_features'].shape}")  
-        print(f"  - 维度0: {features['input_features'].shape[0]} 个patches")  
-        print(f"  - 维度1: {features['input_features'].shape[1]} 个邻居点")  
-        print(f"  - 维度2: {features['input_features'].shape[2]} 个特征 (shape_index, DDC, hbond, charge, hphob)")  
-          
-        print(f"极坐标:")  
-        print(f"  - Rho (径向): {features['rho_coordinates'].shape}")  
-        print(f"  - Theta (角度): {features['theta_coordinates'].shape}")  
-          
-        print(f"其他信息:")  
-        print(f"  - 顶点坐标: {features['vertices'].shape}")  
-        print(f"  - 邻居索引: {len(features['neighbor_indices'])} 个patch")  
-        print(f"  - 输出目录: {features['output_dir']}")  
-          
-        # 测试加载功能  
-        print("\n测试加载预计算特征...")  
-        loaded_features = load_precomputed_features(features['output_dir'])  
-        if loaded_features is not None:  
-            print("加载测试成功!")
+        ply_file_path=args.ply_file,  
+        output_dir=args.output_dir,  
+        masif_app=args.masif_app  
+    )

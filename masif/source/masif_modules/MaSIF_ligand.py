@@ -253,22 +253,47 @@ class MaSIF_ligand:
                 )
 
                 # refine global desc with MLP
-                self.global_desc_1 = tf.keras.layers.Dense(
-                    self.global_desc_1,
-                    self.n_thetas * self.n_rhos,
-                    activation=tf.nn.relu,
-                )
-                self.global_desc_1 = tf.matmul(
-                    tf.transpose(self.global_desc_1), self.global_desc_1
-                ) / tf.cast(tf.shape(self.global_desc_1)[0], tf.float32)
-                self.global_desc_1 = tf.reshape(self.global_desc_1, [1, -1])
-                self.global_desc_1 = tf.nn.dropout(self.global_desc_1, rate=1 - self.keep_prob)
-                self.global_desc_1 = tf.keras.layers.Dense(
-                    self.global_desc_1, 64, activation=tf.nn.relu
-                )
-                self.logits = tf.keras.layers.Dense(
-                    self.global_desc_1, self.n_ligands, activation=tf.identity
-                )
+                W_fc1 = tf.compat.v1.get_variable(  
+                    "dense_1/kernel",  
+                    shape=[self.n_thetas * self.n_rhos * self.n_feat, self.n_thetas * self.n_rhos],  
+                    initializer=tf.keras.initializers.GlorotUniform(),  
+                )  
+                b_fc1 = tf.Variable(  
+                    tf.zeros([self.n_thetas * self.n_rhos]),  
+                    name="dense_1/bias"  
+                )  
+                self.global_desc_1 = tf.nn.relu(tf.matmul(self.global_desc_1, W_fc1) + b_fc1)  
+
+                # 保持第261-265行不变（矩阵运算和dropout）  
+                self.global_desc_1 = tf.matmul(  
+                    tf.transpose(self.global_desc_1), self.global_desc_1  
+                ) / tf.cast(tf.shape(self.global_desc_1)[0], tf.float32)  
+                self.global_desc_1 = tf.reshape(self.global_desc_1, [1, -1])  
+                self.global_desc_1 = tf.nn.dropout(self.global_desc_1, rate=1 - self.keep_prob)  
+
+                # 替换第266-268行  
+                W_fc2 = tf.compat.v1.get_variable(  
+                    "dense_2/kernel",  
+                    shape=[self.global_desc_1.shape[-1], 64],  
+                    initializer=tf.keras.initializers.GlorotUniform(),  
+                )  
+                b_fc2 = tf.Variable(  
+                    tf.zeros([64]),  
+                    name="dense_2/bias"  
+                )  
+                self.global_desc_1 = tf.nn.relu(tf.matmul(self.global_desc_1, W_fc2) + b_fc2)  
+
+                # 替换第269-271行  
+                W_fc3 = tf.compat.v1.get_variable(  
+                    "dense_3/kernel",  
+                    shape=[64, self.n_ligands],  
+                    initializer=tf.keras.initializers.GlorotUniform(),  
+                )  
+                b_fc3 = tf.Variable(  
+                    tf.zeros([self.n_ligands]),  
+                    name="dense_3/bias"  
+                )  
+                self.logits = tf.matmul(self.global_desc_1, W_fc3) + b_fc3
                 # compute data loss
                 self.labels = tf.expand_dims(self.labels, axis=0)
                 self.logits = tf.expand_dims(self.logits, axis=0)

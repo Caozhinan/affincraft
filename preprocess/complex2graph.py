@@ -37,8 +37,7 @@ def parallel_helper(proteinpdb, ligandsdf, name_prefix, mol, pdict, protein_cuto
           
         # 机器学习相关评分特征  
         res['rfscore'] = RF_score(liginfo, proinfo)  # 随机森林打分  
-        res['gbscore'] = GB_score(liginfo, proinfo)  # 梯度提升树打分  
-        res['ecif'] = np.array(GetECIF(str(proteinpdb), str(templigand)))  # ECIF 特征（原子对计数）  
+        res['gbscore'] = GB_score(liginfo, proinfo)  # 梯度提升树打分   
           
         # 新增：PLIP相互作用分析  
         print(f"正在进行PLIP分析: {name}")  

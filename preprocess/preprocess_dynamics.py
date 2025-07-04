@@ -34,10 +34,6 @@ def parallel_helper(refined_path: Path, name: str):
             # 计算各种打分
             res['rfscore'] = RF_score(liginfo, proinfo)
             res['gbscore'] = GB_score(liginfo, proinfo)
-            res['ecif'] = np.array(GetECIF(
-                str(refined_path / name / f"{name}_protein_{i}.pdb"),
-                str(refined_path / name / f"{name}_ligand_{i}.sdf"))
-            )
         except RuntimeError as e:
             continue  # 跳过异常帧
         except OSError as e:

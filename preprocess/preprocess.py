@@ -6,7 +6,6 @@ from torch_geometric.data import Data
 import torch  
 from rdkit import Chem  
 from pymol import cmd  
-from ecif import GetECIF  
 # 添加PLIP导入  
 from plip.structure.preparation import PDBComplex  
 import tempfile  
@@ -312,13 +311,13 @@ def gen_spatial_edge(dm: np.ndarray, spatial_cutoff: float = 5):
     return edge_index, edge_attr
 
 def gen_ligpro_edge(dm: np.ndarray, pocket_cutoff: float, plip_interactions=None, lig_coord=None, pro_coord=None):  
-    print(f"DEBUG: plip_interactions = {plip_interactions}")  
-    print(f"DEBUG: plip_interactions is None = {plip_interactions is None}")  
+    # print(f"DEBUG: plip_interactions = {plip_interactions}")  
+    # print(f"DEBUG: plip_interactions is None = {plip_interactions is None}")  
       
-    if plip_interactions:  
-        print(f"DEBUG: Found {len(plip_interactions)} binding sites")  
-        for bsid, interactions in plip_interactions.items():  
-            print(f"DEBUG: Binding site {bsid} has interactions: {list(interactions.keys())}")  
+    # if plip_interactions:  
+    #     print(f"DEBUG: Found {len(plip_interactions)} binding sites")  
+    #     for bsid, interactions in plip_interactions.items():  
+    #         print(f"DEBUG: Binding site {bsid} has interactions: {list(interactions.keys())}")  
     
 #     生成配体-蛋白之间的边，包括PLIP相互作用和空间边  
 #       

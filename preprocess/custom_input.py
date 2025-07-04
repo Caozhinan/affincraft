@@ -2,7 +2,7 @@ import argparse  # 解析命令行参数
 from pathlib import Path  # 跨平台处理文件和路径
 from tqdm import tqdm  # 进度条，可显示任务进度
 import pickle  # 用于保存/加载Python对象
-from preprocess import  gen_graph, to_pyg_graph, get_info, RF_score, GB_score, GetECIF , analyze_plip_interactions  # 预处理和特征生成相关函数
+from preprocess import  gen_graph, to_pyg_graph, get_info, RF_score, GB_score,  analyze_plip_interactions  # 预处理和特征生成相关函数
 from joblib import Parallel, delayed  # 并行计算工具
 from utils import read_mol, obabel_pdb2mol, pymol_pocket  # 读取分子和格式转换工具
 import numpy as np  # 数值计算库
@@ -116,7 +116,7 @@ def parallel_helper(proteinpdb, ligandsdf, name, pk, rmsd, protein_cutoff, pocke
         # 计算评分特征  
         res['rfscore'] = RF_score(liginfo, proinfo)  
         res['gbscore'] = GB_score(liginfo, proinfo)  
-        res['ecif'] = np.array(GetECIF(str(proteinpdb), str(ligandsdf)))  
+        # res['ecif'] = np.array(GetECIF(str(proteinpdb), str(ligandsdf)))  
           
         # 新增：PLIP相互作用分析  
         print(f"正在进行PLIP分析: {name}")  
@@ -154,7 +154,7 @@ def parallel_helper(proteinpdb, ligandsdf, name, pk, rmsd, protein_cutoff, pocke
         'edge_index': raw[2], 'edge_feat': raw[3], 'node_feat': raw[1], 'coords': raw[0],  
         'pro_name': res['protein_atom_names'], 'AA_name': res['protein_aa_names'],  
         'smiles': res['ligand_smiles'], 'rmsd': rmsd,  
-        'rfscore': res['rfscore'], 'gbscore': res['gbscore'], 'ecif': res['ecif'],  
+        'rfscore': res['rfscore'], 'gbscore': res['gbscore'], 
         'pk': pk, 'pdbid': name, 'num_node': raw[4], 'num_edge': raw[5]  
     }  
       

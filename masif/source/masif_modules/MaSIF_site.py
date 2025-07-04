@@ -321,13 +321,34 @@ class MaSIF_site:
                 self.global_desc = tf.reshape(
                     self.global_desc, [-1, self.n_thetas * self.n_rhos * self.n_feat]
                 )
-                self.global_desc = tf.keras.layers.Dense(  
-                    units=self.n_thetas * self.n_rhos, # 明确指定 units  
-                    activation=tf.identity,  
-                )(self.global_desc)
-                self.global_desc = tf.keras.layers.Dense(
-                    self.global_desc, self.n_feat, activation=tf.nn.relu
-                )
+                with tf.compat.v1.variable_scope("dense_fc1"):  
+                    input_dim = self.n_thetas * self.n_rhos * self.n_feat  
+                    output_dim = self.n_thetas * self.n_rhos  
+                    W_fc1 = tf.compat.v1.get_variable(  
+                        "kernel",  
+                        shape=[input_dim, output_dim],  
+                        initializer=tf.keras.initializers.GlorotUniform(),  
+                    )  
+                    b_fc1 = tf.Variable(  
+                        tf.zeros([output_dim]),  
+                        name="bias"  
+                    )  
+                    self.global_desc = tf.matmul(self.global_desc, W_fc1) + b_fc1  # activation=tf.identity  
+                
+                # 替换第328-330行的第二个Dense层    
+                with tf.compat.v1.variable_scope("dense_fc2"):  
+                    input_dim = self.n_thetas * self.n_rhos  
+                    output_dim = self.n_feat  
+                    W_fc2 = tf.compat.v1.get_variable(  
+                        "kernel",  
+                        shape=[input_dim, output_dim],  
+                        initializer=tf.keras.initializers.GlorotUniform(),  
+                    )  
+                    b_fc2 = tf.Variable(  
+                        tf.zeros([output_dim]),  
+                        name="bias"  
+                    )  
+                    self.global_desc = tf.nn.relu(tf.matmul(self.global_desc, W_fc2) + b_fc2)
 
                 # Do a second convolutional layer. input: batch_size, n_feat -- output: batch_size, n_feat
                 if n_conv_layers > 1:
@@ -450,14 +471,29 @@ class MaSIF_site:
                     self.global_desc = tf.reduce_max(self.global_desc, axis=2)
                     self.global_desc_shape = tf.shape(self.global_desc)
                 # refine global desc with MLP
-                self.global_desc = tf.keras.layers.Dense(
-                    self.global_desc, self.n_thetas, activation=tf.nn.relu
-                )
+                # 替换第453-455行  
+                W_fc1 = tf.compat.v1.get_variable(  
+                    "dense_1/kernel",  
+                    shape=[self.global_desc.shape[-1], self.n_thetas],  
+                    initializer=tf.keras.initializers.GlorotUniform(),  
+                )  
+                b_fc1 = tf.Variable(  
+                    tf.zeros([self.n_thetas]),  
+                    name="dense_1/bias"  
+                )  
+                self.global_desc = tf.nn.relu(tf.matmul(self.global_desc, W_fc1) + b_fc1)  
 
-                # self.labels = tf.expand_dims(self.labels, axis=0)
-                self.logits = tf.keras.layers.Dense(
-                    self.global_desc, self.n_labels, activation=tf.identity
-                )
+                # 替换第458-460行  
+                W_fc2 = tf.compat.v1.get_variable(  
+                    "dense_2/kernel",   
+                    shape=[self.n_thetas, self.n_labels],  
+                    initializer=tf.keras.initializers.GlorotUniform(),  
+                )  
+                b_fc2 = tf.Variable(  
+                    tf.zeros([self.n_labels]),  
+                    name="dense_2/bias"  
+                )  
+                self.logits = tf.matmul(self.global_desc, W_fc2) + b_fc2
                 # self.logits = tf.expand_dims(self.logits, axis=0)
                 self.eval_labels = tf.concat(
                     [
