@@ -2,7 +2,7 @@ import argparse  # 命令行参数解析
 from pathlib import Path  # 跨平台路径对象
 from tqdm import tqdm  # 进度条（本脚本未用到）
 import pickle  # 对象序列化/反序列化
-from preprocess import gen_feature, gen_graph, to_pyg_graph, get_info, RF_score, GB_score, GetECIF, analyze_plip_interactions  # 自定义化学特征/图处理函数
+from preprocess import gen_feature, gen_graph, to_pyg_graph, get_info, RF_score, GB_score,  analyze_plip_interactions  # 自定义化学特征/图处理函数
 from joblib import Parallel, delayed  # 并行处理
 from utils import read_mol, obabel_pdb2mol, pymol_pocket, correct_sanitize_v2  # 分子文件处理工具
 import numpy as np  # 数值处理
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument('protein', type=Path)  # 蛋白 pdb 文件
     parser.add_argument('ligand', type=Path)  # 配体 sdf/mol 文件
     parser.add_argument('output', type=Path)  # 输出文件名（pkl 格式保存所有图的列表）
-    parser.add_argument('--njobs', type=int, default=-1)  # 并发进程数，-1 用全部 CPU
+    parser.add_argument('--njobs', type=int, default=8)  # 并发进程数，-1 用全部 CPU
     parser.add_argument('--protein_cutoff', type=float, default=5.)  # 蛋白原子边界距离（Å）
     parser.add_argument('--pocket_cutoff', type=float, default=5.)  # pocket 原子边界距离（Å）
     parser.add_argument('--spatial_cutoff', type=float, default=5.)  # 图生成时空间距离阈值

@@ -136,27 +136,33 @@ def parallel_helper(proteinpdb, ligandsdf, name, pk, rmsd, protein_cutoff, pocke
       
     try:  
         # 修改：传递PLIP分析结果和文件路径给gen_graph  
-        raw = gen_graph(  
-            ligand, pocket, name,  
-            protein_cutoff=protein_cutoff,  
-            pocket_cutoff=pocket_cutoff,  
-            spatial_cutoff=spatial_cutoff,  
-            protein_file=str(proteinpdb),  
-            ligand_file=str(ligandsdf),  
-            plip_interactions=res['plip_interactions']  
-        )  
+        raw = gen_graph(
+            ligand, pocket, name,
+            protein_cutoff=protein_cutoff,
+            pocket_cutoff=pocket_cutoff,
+            spatial_cutoff=spatial_cutoff,
+            protein_file=str(proteinpdb),
+            ligand_file=str(ligandsdf),
+            plip_interactions=res['plip_interactions']
+        )
+
+        comp_coord, comp_feat, comp_ei, comp_ea, comp_num_node, comp_num_edge, lig_sei, lig_sea, pro_sei, pro_sea = raw
     except ValueError as e:  
         print(f"{name}: Error gen_graph from raw feature {str(e)}")  
         return None  
       
     # 返回字典格式  
-    result_dict = {  
-        'edge_index': raw[2], 'edge_feat': raw[3], 'node_feat': raw[1], 'coords': raw[0],  
-        'pro_name': res['protein_atom_names'], 'AA_name': res['protein_aa_names'],  
-        'smiles': res['ligand_smiles'], 'rmsd': rmsd,  
-        'rfscore': res['rfscore'], 'gbscore': res['gbscore'], 
-        'pk': pk, 'pdbid': name, 'num_node': raw[4], 'num_edge': raw[5]  
-    }  
+    result_dict = {
+        'edge_index': comp_ei, 'edge_feat': comp_ea, 'node_feat': comp_feat, 'coords': comp_coord,
+        'pro_name': res['protein_atom_names'], 'AA_name': res['protein_aa_names'],
+        'smiles': res['ligand_smiles'], 'rmsd': rmsd,
+        'rfscore': res['rfscore'], 'gbscore': res['gbscore'],
+        'pk': pk, 'pdbid': name, 'num_node': comp_num_node, 'num_edge': comp_num_edge,
+        'lig_spatial_edge_index': lig_sei,
+        'lig_spatial_edge_attr': lig_sea,
+        'pro_spatial_edge_index': pro_sei + len(comp_feat) // 2,  # 蛋白空间边下标偏移
+        'pro_spatial_edge_attr': pro_sea
+    }
       
     return result_dict
 

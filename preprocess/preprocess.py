@@ -392,14 +392,14 @@ def gen_graph(ligand: tuple, pocket: tuple, name: str, protein_cutoff: float,
     pro_sei = np.empty((2, 0), dtype=np.int64)  
     pro_sea = np.empty((0, 4), dtype=np.float32)
     # 配体内部空间边：所有距离小于 spatial_cutoff 的配体原子对
-    # lig_dm = cdist(lig_coord, lig_coord)   # 配体原子之间的距离矩阵
-    # lig_sei, lig_sea = gen_spatial_edge(lig_dm, spatial_cutoff=spatial_cutoff)  # 生成空间边
-    # lig_sei, lig_sea = remove_duplicated_edges(lig_sei, lig_sea, lig_ei)        # 去掉和结构边重复的空间边
+    lig_dm = cdist(lig_coord, lig_coord)   # 配体原子之间的距离矩阵
+    lig_sei, lig_sea = gen_spatial_edge(lig_dm, spatial_cutoff=spatial_cutoff)  # 生成空间边
+    lig_sei, lig_sea = remove_duplicated_edges(lig_sei, lig_sea, lig_ei)        # 去掉和结构边重复的空间边
 
-    # # 蛋白内部空间边：所有距离小于 spatial_cutoff 的蛋白原子对
-    # pro_dm = cdist(pro_coord, pro_coord)   # 蛋白原子之间的距离矩阵
-    # pro_sei, pro_sea = gen_spatial_edge(pro_dm, spatial_cutoff=spatial_cutoff)  # 生成空间边
-    # pro_sei, pro_sea = remove_duplicated_edges(pro_sei, pro_sea, pro_ei)        # 去掉和结构边重复的空间边
+    # 蛋白内部空间边：所有距离小于 spatial_cutoff 的蛋白原子对
+    pro_dm = cdist(pro_coord, pro_coord)   # 蛋白原子之间的距离矩阵
+    pro_sei, pro_sea = gen_spatial_edge(pro_dm, spatial_cutoff=spatial_cutoff)  # 生成空间边
+    pro_sei, pro_sea = remove_duplicated_edges(pro_sei, pro_sea, pro_ei)        # 去掉和结构边重复的空间边
 
     # 配体-蛋白之间的空间边：所有距离小于 pocket_cutoff 的配体-蛋白原子对
     dm_lig_pro = cdist(lig_coord, pro_coord)  
@@ -442,12 +442,12 @@ def gen_graph(ligand: tuple, pocket: tuple, name: str, protein_cutoff: float,
     if len(pro_ei.shape) == 2 and len(pro_ei.T) >= 3:   # 如果蛋白有结构边
         comp_ei = np.hstack([comp_ei, pro_ei + len(lig_feat)])   # 蛋白边下标整体平移
         comp_ea = np.vstack([comp_ea, pro_ea])                  # 合并蛋白边特征
-    # if len(lig_sei.shape) == 2 and len(lig_sei.T) >= 3:         # 如果配体有空间边
-    #     comp_ei = np.hstack([comp_ei, lig_sei])                 # 合并配体空间边
-    #     comp_ea = np.vstack([comp_ea, lig_sea])                 # 合并配体空间边特征
-    # if len(pro_sei.shape) == 2 and len(pro_sei.T) >= 3:         # 如果蛋白有空间边
-    #     comp_ei = np.hstack([comp_ei, pro_sei + len(lig_feat)]) # 蛋白空间边下标整体平移
-    #     comp_ea = np.vstack([comp_ea, pro_sea])                 # 合并蛋白空间边特征
+    if len(lig_sei.shape) == 2 and len(lig_sei.T) >= 3:         # 如果配体有空间边
+        comp_ei = np.hstack([comp_ei, lig_sei])                 # 合并配体空间边
+        comp_ea = np.vstack([comp_ea, lig_sea])                 # 合并配体空间边特征
+    if len(pro_sei.shape) == 2 and len(pro_sei.T) >= 3:         # 如果蛋白有空间边
+        comp_ei = np.hstack([comp_ei, pro_sei + len(lig_feat)]) # 蛋白空间边下标整体平移
+        comp_ea = np.vstack([comp_ea, pro_sea])                 # 合并蛋白空间边特征
     if len(lig_pock_ei.shape) == 2 and len(lig_pock_ei.T) >= 3: # 如果有配体-蛋白空间边
         comp_ei = np.hstack([comp_ei, lig_pock_ei])             # 合并配体-蛋白空间边
         comp_ea = np.vstack([comp_ea, lig_pock_ea])             # 合并配体-蛋白空间边特征
@@ -455,13 +455,13 @@ def gen_graph(ligand: tuple, pocket: tuple, name: str, protein_cutoff: float,
     # 记录每类节点、边数
     comp_num_node = np.array([len(lig_feat), len(pro_feat)], dtype=np.int64)   # 配体、蛋白节点数
     comp_num_edge = np.array([  
-    lig_ei.T.shape[0],               # 配体结构边数  
-    pro_ei.T.shape[0],               # 蛋白结构边数  
-    lig_pock_ei.T.shape[0],          # 配体-蛋白边数  
-    0,                               # 配体空间边数 (设为0)  
-    0,                               # 蛋白空间边数 (设为0)  
+    lig_ei.shape[1],           # 配体结构边数  
+    pro_ei.shape[1],           # 蛋白结构边数  
+    lig_pock_ei.shape[1],      # 配体-蛋白边数  
+    lig_sei.shape[1],          # 配体空间边数
+    pro_sei.shape[1],          # 蛋白空间边数
 ], dtype=np.int64)
-    return comp_coord, comp_feat, comp_ei, comp_ea, comp_num_node, comp_num_edge  # 返回所有信息
+    return comp_coord, comp_feat, comp_ei, comp_ea, comp_num_node, comp_num_edge, lig_sei, lig_sea, pro_sei, pro_sea
 
 def load_pk_data(data_path: Path):
     # 从txt读取pdbid与pk值
