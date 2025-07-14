@@ -1,0 +1,53 @@
+ p read_pkl.py /xcfhome/zncao02/affincraft/data/6w1i-G4P/output/6w1i-G4P_features_with_masif.pkl
+正在加载PKL文件: /xcfhome/zncao02/affincraft/data/6w1i-G4P/output/6w1i-G4P_features_with_masif.pkl
+成功加载 1 个复合物
+
+============================================================
+复合物 1: 6w1i-G4P
+============================================================
+
+=== 所有数据字段和形状 ===
+  edge_index: ndarray shape (2, 2266)
+    数据类型: int64
+  edge_feat: ndarray shape (2266, 4)
+    数据类型: float32
+  node_feat: ndarray shape (170, 9)
+    数据类型: int64
+  coords: ndarray shape (170, 3)
+    数据类型: float64
+  pro_name: ndarray shape (612,)
+    数据类型: <U3
+  AA_name: ndarray shape (612,)
+    数据类型: <U3
+  smiles: str - NC1=NC2=C(/N=C\N2C2OC(COP(=O)([O-])OP(=O)([O-])[O-])C(OP(=O)([O-])OP(=O)([O-])[O-])C2O)C(=O)N1
+  rmsd: float - 1.4
+  rfscore: ndarray shape (100,)
+    数据类型: float64
+  gbscore: ndarray shape (400,)
+    数据类型: float64
+  pk: float - 6.62
+  pdbid: str - 6w1i-G4P
+  num_node: ndarray shape (2,)
+    数据类型: int64
+  num_edge: ndarray shape (5,)
+    数据类型: int64
+  lig_spatial_edge_index: ndarray shape (2, 434)
+    数据类型: int64
+  lig_spatial_edge_attr: ndarray shape (434, 4)
+    数据类型: float32
+  pro_spatial_edge_index: ndarray shape (2, 1498)
+    数据类型: int64
+  pro_spatial_edge_attr: ndarray shape (1498, 4)
+    数据类型: float32
+  masif_input_feat: ndarray shape (3888, 100, 5)
+    数据类型: float64
+  masif_rho_wrt_center: ndarray shape (3888, 100)
+    数据类型: float64
+  masif_theta_wrt_center: ndarray shape (3888, 100)
+    数据类型: float64
+  masif_mask: ndarray shape (3888, 100)
+    数据类型: float64
+  masif_desc_straight: ndarray shape (3888, 80)
+    数据类型: float32
+  masif_desc_flipped: ndarray shape (3888, 80)
+    数据类型: float32

@@ -2,7 +2,7 @@ import argparse  # 命令行参数解析
 from pathlib import Path  # 跨平台路径对象
 from tqdm import tqdm  # 进度条（本脚本未用到）
 import pickle  # 对象序列化/反序列化
-from preprocess import gen_feature, gen_graph, to_pyg_graph, get_info, RF_score, GB_score,  analyze_plip_interactions  # 自定义化学特征/图处理函数
+from preprocess import gen_feature, gen_graph, to_pyg_graph, get_info,  GB_score,  analyze_plip_interactions  # 自定义化学特征/图处理函数
 from joblib import Parallel, delayed  # 并行处理
 from utils import read_mol, obabel_pdb2mol, pymol_pocket, correct_sanitize_v2  # 分子文件处理工具
 import numpy as np  # 数值处理
@@ -36,7 +36,7 @@ def parallel_helper(proteinpdb, ligandsdf, name_prefix, mol, pdict, protein_cuto
         res = gen_feature(ligand, pocket, name)  # 生成结构特征（如原子、键、环境等）  
           
         # 机器学习相关评分特征  
-        res['rfscore'] = RF_score(liginfo, proinfo)  # 随机森林打分  
+        # res['rfscore'] = RF_score(liginfo, proinfo)  # 随机森林打分  
         res['gbscore'] = GB_score(liginfo, proinfo)  # 梯度提升树打分   
           
         # 新增：PLIP相互作用分析  

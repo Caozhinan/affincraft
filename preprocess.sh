@@ -39,7 +39,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r receptor ligand name pk rmsd; do
     
     # Step 1: 预处理 - 生成基础PKL文件  
     echo "Step 1: Running custom_input.py..."  
-    python /xcfhome/zncao02/AffinSculptor/preprocess/custom_input.py \
+    python /xcfhome/zncao02/affincraft/preprocess/custom_input.py \
         "$temp_csv" \
         "$pkl_output" || {  
         echo "Error in custom_input.py for $name"  
@@ -59,7 +59,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r receptor ligand name pk rmsd; do
     
     # Step 2: 网格和表面特征生成  
     echo "Step 2: Running meshfeatureGen.py..."  
-    python /xcfhome/zncao02/AffinSculptor/masif/meshfeatureGen.py \
+    python /xcfhome/zncao02/affincraft/masif/meshfeatureGen.py \
         --pdb_file "$target_dir/complex.pdb" \
         --chain_id "A" \
         --ligand_code "UNK" \
@@ -72,7 +72,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r receptor ligand name pk rmsd; do
     
     # Step 3: 特征预计算  
     echo "Step 3: Running feature_precompute.py..."  
-    python /xcfhome/zncao02/AffinSculptor/masif/feature_precompute.py \
+    python /xcfhome/zncao02/affincraft/masif/feature_precompute.py \
         --ply_file "$output_dir/surfaces/complex_A.ply" \
         --output_dir "$output_dir" \
         --masif_app "masif_site" || {  
@@ -82,7 +82,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r receptor ligand name pk rmsd; do
     
     # Step 4: 指纹生成
     echo "Step 4: Running fingerprint_gen.py..."
-    python /xcfhome/zncao02/AffinSculptor/masif/fingerprint_gen.py \
+    python /xcfhome/zncao02/affincraft/masif/fingerprint_gen.py \
         --precomputed_dir "$output_dir/precomputed/complex_A" \
         --output_dir "$output_dir" \
         --ppi_pair_id "complex_A" \
@@ -93,7 +93,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r receptor ligand name pk rmsd; do
     
     # Step 5: 整合MaSIF特征到现有PKL文件  
     echo "Step 5: Merging MaSIF features to existing PKL..."  
-    python /xcfhome/zncao02/AffinSculptor/preprocess/merge_pkl.py \
+    python /xcfhome/zncao02/affincraft/preprocess/merge_pkl.py \
         --pkl_file "$pkl_output" \
         --output_dir "$output_dir" \
         --name "$name" \

@@ -24,7 +24,8 @@ from fairseq.modules import (
 )
 from fairseq.utils import safe_hasattr
 
-from ..modules import init_graphormer_params, GraphormerGraphEncoder
+from ..modules import init_graphormer_params, AffinCraftGraphEncoder
+from ..modules.affincraft_graph_encoder import AffinCraftGraphEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -197,35 +198,25 @@ class GraphormerEncoder(FairseqEncoder):
         super().__init__(dictionary=None)
         self.max_nodes = args.max_nodes
 
-        self.graph_encoder = GraphormerGraphEncoder(
-            # < for graphormer
-            num_atoms=args.num_atoms,
-            num_in_degree=args.num_in_degree,
-            num_out_degree=args.num_out_degree,
-            num_edges=args.num_edges,
-            num_spatial=args.num_spatial,
-            num_edge_dis=args.num_edge_dis,
-            edge_type=args.edge_type,
-            multi_hop_max_dist=args.multi_hop_max_dist,
-            # >
-            num_encoder_layers=args.encoder_layers,
-            embedding_dim=args.encoder_embed_dim,
-            ffn_embedding_dim=args.encoder_ffn_embed_dim,
-            num_attention_heads=args.encoder_attention_heads,
-            dropout=args.dropout,
-            attention_dropout=args.attention_dropout,
-            activation_dropout=args.act_dropout,
-            layerdrop=args.layerdrop,  # !
-            encoder_normalize_before=args.encoder_normalize_before,
-            apply_graphormer_init=args.apply_graphormer_init,
-            activation_fn=args.activation_fn,
-            embed_scale=args.embed_scale if args.embed_scale > 0 else None,  # !
-            dist_head=args.dist_head,
-            sandwich_ln=args.sandwich_ln,
-            # 3d_encoder
-            num_dist_head_kernel=args.num_dist_head_kernel,
-            num_edge_types=args.num_edge_types,
-        )
+        self.graph_encoder = AffinCraftGraphEncoder(  
+            num_encoder_layers=args.encoder_layers,  
+            embedding_dim=args.encoder_embed_dim,  
+            ffn_embedding_dim=args.encoder_ffn_embed_dim,  
+            num_attention_heads=args.encoder_attention_heads,  
+            dropout=args.dropout,  
+            attention_dropout=args.attention_dropout,  
+            activation_dropout=args.act_dropout,  
+            layerdrop=args.layerdrop,  
+            encoder_normalize_before=args.encoder_normalize_before,  
+            apply_graphormer_init=args.apply_graphormer_init,  
+            activation_fn=args.activation_fn,  
+            embed_scale=args.embed_scale if args.embed_scale > 0 else None,  
+            sandwich_ln=args.sandwich_ln,  
+            # AffinCraft特定参数  
+            node_feat_dim=9,  
+            use_masif=True,  
+            use_gbscore=True,  
+        ) 
 
         self.share_input_output_embed = args.share_encoder_input_output_embed
         self.embed_out = None
@@ -237,7 +228,6 @@ class GraphormerEncoder(FairseqEncoder):
         self.masked_lm_pooler = nn.Linear(
             args.encoder_embed_dim, args.encoder_embed_dim
         )
-
         self.lm_head_transform_weight = nn.Linear(
             args.encoder_embed_dim, args.encoder_embed_dim
         )

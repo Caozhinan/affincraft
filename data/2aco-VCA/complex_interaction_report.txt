@@ -1,0 +1,24 @@
+蛋白质-配体相互作用分析报告
+==================================================
+
+PDB文件: complex.pdb
+配体原子数: 53
+口袋原子数: 387
+
+蛋白-配体相互作用:
+------------------------------
+hydrophobic: 25 个
+hydrogen_bonds: 0 个
+pi_stacking: 2 个
+salt_bridges: 0 个
+pi_cation: 4 个
+halogen_bonds: 0 个
+
+蛋白质内部相互作用:
+------------------------------
+hydrophobic: 156 个
+hydrogen_bonds: 55 个
+pi_stacking: 2 个
+salt_bridges: 3 个
+pi_cation: 4 个
+halogen_bonds: 0 个

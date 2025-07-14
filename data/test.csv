@@ -1,3 +1,2 @@
 receptor,ligand,name,pk,rmsd
-/xcfhome/zncao02/dataset_bap/test_set/custom/2wh8-II2/protein.pdb,/xcfhome/zncao02/dataset_bap/test_set/custom/2wh8-II2/ligand.sdf,2wh8-II2,6.62,1.4
-
+/xcfhome/zncao02/affincraft/data/2aco-VCA/protein.pdb,/xcfhome/zncao02/affincraft/data/2aco-VCA/ligand.sdf,2aco-VCA,6.62,0.0

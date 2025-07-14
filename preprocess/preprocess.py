@@ -11,6 +11,11 @@ from plip.structure.preparation import PDBComplex
 import tempfile  
 import os  
 from plip_analysis import merge_protein_ligand_with_pymol  
+from intra_pro_plip import (  
+    InteractionAnalyzer, find_hydrophobic_atoms, find_hba, find_hbd,   
+    find_rings, find_charged_groups, find_halogen_acceptors, find_halogen_donors,  
+    AtomInfo, Config  
+)
 # 扩展边特征编码  
 SPATIAL_EDGE = [4, 0, 0]  # 原有空间边  
 HYDROGEN_BOND_EDGE = [5, 1, 0]  # 氢键  
@@ -350,6 +355,175 @@ def gen_ligpro_edge(dm: np.ndarray, pocket_cutoff: float, plip_interactions=None
     edge_attr = np.array(edge_attr_list, dtype=np.float32) if edge_attr_list else np.empty((0, 4), dtype=np.float32)  
       
     return edge_index, edge_attr
+ 
+  
+def classify_protein_spatial_edges(pro_sei, pro_sea, pro_coord, protein_file):  
+    """  
+    使用更新的 intra_pro_plip.py 脚本为蛋白质内部空间边分配相互作用类型  
+      
+    Args:  
+        pro_sei: 蛋白质空间边索引  
+        pro_sea: 蛋白质空间边属性    
+        pro_coord: 蛋白质原子坐标  
+        protein_file: 蛋白质PDB文件路径  
+      
+    Returns:  
+        tuple: (classified_edge_index, classified_edge_attr)  
+    """  
+    if len(pro_sei) == 0:  
+        return pro_sei, pro_sea  
+      
+    try:  
+        # 使用OpenBabel加载蛋白质结构  
+        from openbabel import pybel  
+        molecule = pybel.readfile("pdb", protein_file).__next__()  
+          
+        # 创建相互作用分析器  
+        analyzer = InteractionAnalyzer()  
+          
+        # 识别各种功能基团  
+        hydrophobic_atoms = find_hydrophobic_atoms(molecule)  
+        hba_atoms = find_hba(molecule)  
+        hbd_atoms = find_hbd(molecule, hydrophobic_atoms)  
+        rings = find_rings(molecule)  
+        charged_groups = find_charged_groups(molecule)  
+        hal_acceptors = find_halogen_acceptors(molecule)  
+        hal_donors = find_halogen_donors(molecule)  
+          
+        # 为每条空间边分配类型  
+        classified_edge_attr = []  
+          
+        for i, (src_idx, tgt_idx) in enumerate(pro_sei.T):  
+            src_coord = pro_coord[src_idx]  
+            tgt_coord = pro_coord[tgt_idx]  
+            distance = np.linalg.norm(src_coord - tgt_coord)  
+              
+            # 找到最接近的原子  
+            src_atom = find_closest_atom_by_coord(src_coord, molecule)  
+            tgt_atom = find_closest_atom_by_coord(tgt_coord, molecule)  
+              
+            if src_atom and tgt_atom:  
+                # 使用InteractionAnalyzer分析原子对  
+                interaction_result = analyzer.analyze_atom_pair(src_atom, tgt_atom, distance)  
+                  
+                if interaction_result and interaction_result['interaction_types']:  
+                    # 取第一个检测到的相互作用类型  
+                    interaction_type = interaction_result['interaction_types'][0]  
+                      
+                    # 映射到标准类型名称  
+                    if interaction_type == 'hydrogen_bond':  
+                        edge_type_name = 'hydrogen_bonds'  
+                    elif interaction_type == 'hydrophobic':  
+                        edge_type_name = 'hydrophobic_contacts'  
+                    elif interaction_type == 'salt_bridge':  
+                        edge_type_name = 'salt_bridges'  
+                    elif interaction_type == 'halogen_bond':  
+                        edge_type_name = 'halogen_bonds'  
+                    else:  
+                        edge_type_name = 'others'  
+                else:  
+                    # 检查π-π堆积和π-阳离子相互作用  
+                    edge_type_name = check_ring_interactions(  
+                        src_atom, tgt_atom, distance, rings, charged_groups  
+                    )  
+            else:  
+                edge_type_name = 'others'  
+              
+            # 获取边类型编码  
+            edge_type = INTERACTION_TYPE_MAP.get(edge_type_name, OTHERS_EDGE)  
+              
+            # 创建边特征：[类型编码] + [距离]  
+            edge_feature = edge_type + [distance]  
+            classified_edge_attr.append(edge_feature)  
+          
+        classified_edge_attr = np.array(classified_edge_attr, dtype=np.float32)  
+          
+    except Exception as e:  
+        print(f"使用 intra_pro_plip 分析失败: {e}")  
+        # 如果分析失败，将所有边设置为OTHERS类型  
+        classified_edge_attr = []  
+        for i, (src_idx, tgt_idx) in enumerate(pro_sei.T):  
+            distance = np.linalg.norm(pro_coord[src_idx] - pro_coord[tgt_idx])  
+            edge_feature = OTHERS_EDGE + [distance]  
+            classified_edge_attr.append(edge_feature)  
+        classified_edge_attr = np.array(classified_edge_attr, dtype=np.float32)  
+      
+    return pro_sei, classified_edge_attr  
+  
+def find_closest_atom_by_coord(coord, molecule):  
+    """根据坐标找到最接近的原子"""  
+    min_dist = float('inf')  
+    closest_atom = None  
+      
+    for atom in molecule.atoms:  
+        atom_coord = np.array(atom.coords)  
+        dist = np.linalg.norm(np.array(coord) - atom_coord)  
+        if dist < min_dist:  
+            min_dist = dist  
+            closest_atom = AtomInfo(atom)  
+      
+    return closest_atom if min_dist < 2.0 else None  # 2Å阈值  
+  
+def check_ring_interactions(src_atom, tgt_atom, distance, rings, charged_groups):  
+    """检查π-π堆积和π-阳离子相互作用"""  
+    config = Config()  
+      
+    # 检查原子是否在芳香环中  
+    src_ring = None  
+    tgt_ring = None  
+    for ring in rings:  
+        if any(ring_atom.idx == src_atom.idx for ring_atom in ring.atoms):  
+            src_ring = ring  
+        if any(ring_atom.idx == tgt_atom.idx for ring_atom in ring.atoms):  
+            tgt_ring = ring  
+      
+    # 检查π-π堆积  
+    if src_ring and tgt_ring and distance < config.PISTACK_DIST_MAX:  
+        return 'pi_stacking'  
+      
+    # 检查π-阳离子相互作用  
+    if distance < config.PICATION_DIST_MAX:  
+        src_charged = None  
+        tgt_charged = None  
+        for group in charged_groups:  
+            if any(group_atom.idx == src_atom.idx for group_atom in group.atoms):  
+                src_charged = group  
+            if any(group_atom.idx == tgt_atom.idx for group_atom in group.atoms):  
+                tgt_charged = group  
+          
+        if (src_ring and tgt_charged) or (src_charged and tgt_ring):  
+            return 'pi_cation'  
+      
+    return 'others'
+
+def set_ligand_spatial_edge_types(lig_sea):  
+    """  
+    将配体内部空间边的类型统一设置为OTHERS_EDGE  
+      
+    Args:  
+        lig_sea: 配体空间边属性  
+      
+    Returns:  
+        np.array: 更新后的边属性  
+    """  
+    if len(lig_sea) == 0:  
+        return lig_sea  
+      
+    # 为每条边设置OTHERS类型  
+    updated_edge_attr = []  
+      
+    for edge_attr in lig_sea:  
+        # 保留原有的距离信息（如果存在）  
+        if len(edge_attr) > 3:  
+            distance = edge_attr[3]  
+        else:  
+            distance = edge_attr[-1] if len(edge_attr) > 0 else 0.0  
+          
+        # 创建新的边特征：OTHERS_EDGE + 距离  
+        new_edge_feature = OTHERS_EDGE + [distance]  
+        updated_edge_attr.append(new_edge_feature)  
+      
+    return np.array(updated_edge_attr, dtype=np.float32)
 
 def gen_graph(ligand: tuple, pocket: tuple, name: str, protein_cutoff: float,   
               pocket_cutoff: float, spatial_cutoff: float, protein_file=None,   
@@ -395,12 +569,14 @@ def gen_graph(ligand: tuple, pocket: tuple, name: str, protein_cutoff: float,
     lig_dm = cdist(lig_coord, lig_coord)   # 配体原子之间的距离矩阵
     lig_sei, lig_sea = gen_spatial_edge(lig_dm, spatial_cutoff=spatial_cutoff)  # 生成空间边
     lig_sei, lig_sea = remove_duplicated_edges(lig_sei, lig_sea, lig_ei)        # 去掉和结构边重复的空间边
-
+    lig_sea = set_ligand_spatial_edge_types(lig_sea)
     # 蛋白内部空间边：所有距离小于 spatial_cutoff 的蛋白原子对
-    pro_dm = cdist(pro_coord, pro_coord)   # 蛋白原子之间的距离矩阵
-    pro_sei, pro_sea = gen_spatial_edge(pro_dm, spatial_cutoff=spatial_cutoff)  # 生成空间边
-    pro_sei, pro_sea = remove_duplicated_edges(pro_sei, pro_sea, pro_ei)        # 去掉和结构边重复的空间边
-
+    pro_dm = cdist(pro_coord, pro_coord)  
+    pro_sei, pro_sea = gen_spatial_edge(pro_dm, spatial_cutoff=spatial_cutoff)  
+    pro_sei, pro_sea = remove_duplicated_edges(pro_sei, pro_sea, pro_ei)  
+    
+    # 新增：使用更新的 intra_pro_plip 脚本进行类型分类  
+    pro_sei, pro_sea = classify_protein_spatial_edges(pro_sei, pro_sea, pro_coord, protein_file)
     # 配体-蛋白之间的空间边：所有距离小于 pocket_cutoff 的配体-蛋白原子对
     dm_lig_pro = cdist(lig_coord, pro_coord)  
     lig_pock_ei, lig_pock_ea = gen_ligpro_edge(  
@@ -548,18 +724,18 @@ def GB_score(lig_info: dict, pro_info: dict) -> np.ndarray:
 
     return fp.flatten()
 
-def RF_score(lig_info: dict, pro_info: dict):
-    # 生成RFScore特征（配体-蛋白原子对12A内原子对数，100维）
-    LIG_TYPES = ["C", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
-    PRO_TYPES = ["C", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
-    distmap = cdist(lig_info['coord'], pro_info['coord'])
-    fp = np.zeros([10, 10])
-    for i, el in enumerate(LIG_TYPES):
-        lmask = lig_info['elem'] == el
-        if lmask.sum() < 1: continue
-        for j, ep in enumerate(PRO_TYPES):
-            pmask = pro_info['elem'] == ep
-            d = distmap[lmask][:, pmask]
-            v = d[d < 12].shape[0]
-            fp[i, j] = v
-    return fp.flatten()
+# def RF_score(lig_info: dict, pro_info: dict):
+#     # 生成RFScore特征（配体-蛋白原子对12A内原子对数，100维）
+#     LIG_TYPES = ["C", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
+#     PRO_TYPES = ["C", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
+#     distmap = cdist(lig_info['coord'], pro_info['coord'])
+#     fp = np.zeros([10, 10])
+#     for i, el in enumerate(LIG_TYPES):
+#         lmask = lig_info['elem'] == el
+#         if lmask.sum() < 1: continue
+#         for j, ep in enumerate(PRO_TYPES):
+#             pmask = pro_info['elem'] == ep
+#             d = distmap[lmask][:, pmask]
+#             v = d[d < 12].shape[0]
+#             fp[i, j] = v
+#     return fp.flatten()
