@@ -1,0 +1,75 @@
+正在加载PKL文件: /xcfhome/zncao02/affincraft/data/2aco-VCA/output/2aco-VCA_features_with_masif.pkl
+成功加载 1 个复合物
+数据类型: <class 'list'>
+
+================================================================================
+复合物 1: 2aco-VCA
+================================================================================
+
+=== 所有键值对和形状统计 ===
+
+--- 基本信息 ---
+  smiles: str - CCCCCC/C=C\CCCCCCCCCC(=O)[O-]
+  rmsd: float - 0.0
+  pk: float - 6.62
+  pdbid: str - 2aco-VCA
+
+--- 图结构数据 ---
+  edge_index: ndarray shape (2, 1224)
+    数据类型: int64
+  edge_feat: ndarray shape (1224, 4)
+    数据类型: float32
+  node_feat: ndarray shape (118, 9)
+    数据类型: int64
+  coords: ndarray shape (118, 3)
+    数据类型: float64
+
+--- MaSIF特征 ---
+  masif_input_feat: ndarray shape (3444, 100, 5)
+    数据类型: float64
+  masif_rho_wrt_center: ndarray shape (3444, 100)
+    数据类型: float64
+  masif_theta_wrt_center: ndarray shape (3444, 100)
+    数据类型: float64
+  masif_mask: ndarray shape (3444, 100)
+    数据类型: float64
+  masif_desc_straight: ndarray shape (3444, 80)
+    数据类型: float32
+  masif_desc_flipped: ndarray shape (3444, 80)
+    数据类型: float32
+
++++ masif_desc_straight 的值展示 +++
+  masif_desc_straight 前30项: [nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan nan
+ nan nan nan nan nan nan nan nan nan nan nan nan]
+  masif_desc_straight 总形状: (3444, 80)
+
+--- 空间边数据 ---
+  lig_spatial_edge_index: ndarray shape (2, 102)
+    数据类型: int64
+  lig_spatial_edge_attr: ndarray shape (102, 4)
+    数据类型: float32
+  pro_spatial_edge_index: ndarray shape (2, 886)
+    数据类型: int64
+  pro_spatial_edge_attr: ndarray shape (886, 4)
+    数据类型: float32
+
+--- 评分特征 ---
+  gbscore: ndarray shape (400,)
+    数据类型: float64
+
+--- 其他数据 ---
+  pro_name: ndarray shape (596,)
+    数据类型: <U3
+  AA_name: ndarray shape (596,)
+    数据类型: <U3
+  num_node: ndarray shape (2,)
+    数据类型: int64
+  num_edge: ndarray shape (5,)
+    数据类型: int64
+
+--- 统计总结 ---
+  总键数: 23
+  张量/数组键数: 19
+  标量/字符串键数: 4
+
+分析完成！

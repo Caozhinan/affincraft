@@ -71,7 +71,7 @@ def parallel_helper(proteinpdb, ligandsdf, name_prefix, mol, pdict, protein_cuto
   
     # 转换为 PyTorch Geometric 图数据结构，并加上全局特征  
     graph = to_pyg_graph(  
-        list(raw) + [res['rfscore'], res['gbscore'], res['ecif'], -1, name],   
+        list(raw) + [ res['gbscore'], res['ecif'], -1, name],   
         frame=-1, rmsd_lig=0.0, rmsd_pro=0.0  
     )  
   

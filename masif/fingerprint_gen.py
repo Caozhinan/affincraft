@@ -63,7 +63,7 @@ def generate_surface_fingerprints(precomputed_features_dir, output_dir, ppi_pair
     # 首先尝试使用配置的路径  
     if not os.path.exists(model_path + ".meta"):  
         # 如果配置路径不存在，尝试使用绝对路径  
-        abs_model_dir = "/xcfhome/zncao02/AffinSculptor/masif/data/masif_ppi_search/nn_models/sc05/all_feat/model_data/"  
+        abs_model_dir = "/xcfhome/zncao02/affincraft/masif/data/masif_ppi_search/nn_models/sc05/all_feat/model_data/"  
         abs_model_path = os.path.join(abs_model_dir, "model")  
           
         if os.path.exists(abs_model_path + ".meta"):  

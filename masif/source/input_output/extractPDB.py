@@ -9,9 +9,12 @@ from Bio.SeqUtils import IUPACData
 PROTEIN_LETTERS = [x.upper() for x in IUPACData.protein_letters_3to1.keys()]
 
 # Exclude disordered atoms.
-class NotDisordered(Select):
-    def accept_atom(self, atom):
-        return not atom.is_disordered() or atom.get_altloc() == "A"  or atom.get_altloc() == "1" 
+class NotDisordered(Select):  
+    def accept_atom(self, atom):  
+        # 对配体原子更宽松的处理  
+        if atom.get_parent().get_resname() == "UNK":  
+            return not atom.is_disordered() or atom.get_altloc() in ["A", "1", ""]  
+        return not atom.is_disordered() or atom.get_altloc() == "A" or atom.get_altloc() == "1"
 
 
 def find_modified_amino_acids(path):

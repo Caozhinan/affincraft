@@ -114,7 +114,6 @@ def parallel_helper(proteinpdb, ligandsdf, name, pk, rmsd, protein_cutoff, pocke
         }  
           
         # 计算评分特征  
-        # res['rfscore'] = RF_score(liginfo, proinfo)  
         res['gbscore'] = GB_score(liginfo, proinfo)  
         # res['ecif'] = np.array(GetECIF(str(proteinpdb), str(ligandsdf)))  
           
@@ -156,7 +155,7 @@ def parallel_helper(proteinpdb, ligandsdf, name, pk, rmsd, protein_cutoff, pocke
         'edge_index': comp_ei, 'edge_feat': comp_ea, 'node_feat': comp_feat, 'coords': comp_coord,
         'pro_name': res['protein_atom_names'], 'AA_name': res['protein_aa_names'],
         'smiles': res['ligand_smiles'], 'rmsd': rmsd,
-        'rfscore': res['rfscore'], 'gbscore': res['gbscore'],
+        'gbscore': res['gbscore'],
         'pk': pk, 'pdbid': name, 'num_node': comp_num_node, 'num_edge': comp_num_edge,
         'lig_spatial_edge_index': lig_sei,
         'lig_spatial_edge_attr': lig_sea,

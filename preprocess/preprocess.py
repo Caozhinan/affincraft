@@ -16,6 +16,8 @@ from intra_pro_plip import (
     find_rings, find_charged_groups, find_halogen_acceptors, find_halogen_donors,  
     AtomInfo, Config  
 )
+from water_metal_detection import detect_water_bridges_from_atoms, detect_metal_complex_from_atoms
+
 # 扩展边特征编码  
 SPATIAL_EDGE = [4, 0, 0]  # 原有空间边  
 HYDROGEN_BOND_EDGE = [5, 1, 0]  # 氢键  
@@ -426,6 +428,14 @@ def classify_protein_spatial_edges(pro_sei, pro_sea, pro_coord, protein_file):
                     edge_type_name = check_ring_interactions(  
                         src_atom, tgt_atom, distance, rings, charged_groups  
                     )  
+                      
+                    # 新增：检查水桥相互作用  
+                    if edge_type_name == 'others' and detect_water_bridges_from_atoms(src_atom, tgt_atom, distance, molecule):  
+                        edge_type_name = 'water_bridges'  
+                      
+                    # 新增：检查金属配位相互作用  
+                    if edge_type_name == 'others' and detect_metal_complex_from_atoms(src_atom, tgt_atom, distance, molecule):  
+                        edge_type_name = 'metal_complexes'  
             else:  
                 edge_type_name = 'others'  
               
@@ -434,7 +444,7 @@ def classify_protein_spatial_edges(pro_sei, pro_sea, pro_coord, protein_file):
               
             # 创建边特征：[类型编码] + [距离]  
             edge_feature = edge_type + [distance]  
-            classified_edge_attr.append(edge_feature)  
+            classified_edge_attr.append(edge_feature) 
           
         classified_edge_attr = np.array(classified_edge_attr, dtype=np.float32)  
           

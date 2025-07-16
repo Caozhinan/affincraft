@@ -116,7 +116,10 @@ def test_embedding_pipeline(pkl_file_path, batch_size=4, max_complexes=10):
                     print(f"  Graph rep mean: {graph_rep.mean().item():.4f}")  
                     print(f"  Graph rep std: {graph_rep.std().item():.4f}")  
                     print(f"  Graph rep range: [{graph_rep.min().item():.4f}, {graph_rep.max().item():.4f}]")  
-                      
+                    print(f"Input node features contain NaN: {torch.isnan(batch_data['node_feat']).any()}")  
+                    print(f"Input edge features contain NaN: {torch.isnan(batch_data['edge_feat']).any()}")  
+                    print(f"Input GB-Score contain NaN: {torch.isnan(batch_data['gbscore']).any()}")  
+                    print(f"Input MaSIF contain NaN: {torch.isnan(batch_data['masif_desc_straight']).any()}")
                     total_processed += len(batch_data['pdbid'])  
                       
                 except Exception as e:  

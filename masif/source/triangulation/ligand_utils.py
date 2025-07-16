@@ -4,7 +4,7 @@ import shutil
 from io import StringIO, BytesIO
 # 导入RDKit的化学分子处理库
 from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem , rdmolfiles
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 # 导入OpenBabel库用于分子格式转换
 from openbabel import openbabel
@@ -38,99 +38,175 @@ def neutralize_atoms(mol):
 
 
 def amide_to_single_bond(mol2_outfile):
-    # 读取mol2文件，将所有amide类型的键修改为单键
+    """
+    修正mol2文件，将所有 am/ar 类型的键改为单键（1），并修正 .co2 原子类型
+    """
     mol2_new = []
     bond_record = False
-    with open(mol2_outfile, 'r') as f:
-        for line in f.readlines():
-            line = line.rstrip('\n')
+    atom_record = False
+    print("DEBUG: Using modified amide_to_single_bond function")
 
-            # 检查TRIPOS区块标记
-            if line.startswith('@<TRIPOS>'):
-                # 判断是否进入BOND区块
-                if line.startswith('@<TRIPOS>BOND'):
-                    bond_record = True
-                else:
-                    bond_record = False
+    try:
+        with open(mol2_outfile, 'r') as f:
+            for line in f:
+                # 去除行尾换行
+                line = line.rstrip('\n').rstrip('\r')
+
+                # 区块切换
+                if line.startswith('@<TRIPOS>'):
+                    if line.startswith('@<TRIPOS>BOND'):
+                        bond_record = True
+                        atom_record = False
+                    elif line.startswith('@<TRIPOS>ATOM'):
+                        atom_record = True
+                        bond_record = False
+                    else:
+                        bond_record = False
+                        atom_record = False
+                    mol2_new.append(line)
+                    continue
+
+                # 处理原子行
+                if atom_record and line.strip() and not line.startswith('@<TRIPOS>'):
+                    parts = line.split()
+                    if len(parts) >= 6 and '.co2' in parts[5]:
+                        parts[5] = parts[5].replace('.co2', '.2')
+                        line = ' '.join(parts)
+                    else:
+                        line = ' '.join(parts)
+                    mol2_new.append(line)
+                    continue
+
+                # 处理键行
+                if bond_record and line.strip():
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        bond_id, origin_atom_id, target_atom_id, bond_type = parts[:4]
+                        if bond_type.lower() in ('am', 'ar'):
+                            bond_type = '1'
+                        # 保留后面额外字段（如立体化学信息）
+                        line = ' '.join([bond_id, origin_atom_id, target_atom_id, bond_type] + parts[4:])
+                    else:
+                        print(f"Warning: Skipping malformed bond line: '{line}'")
+                    mol2_new.append(line)
+                    continue
+
+                # 其他行（注释、空行等）
                 mol2_new.append(line)
+
+        # 覆盖写回，注意用真换行
+        with open(mol2_outfile, 'w') as f:
+            f.write('\n'.join(mol2_new) + '\n')
+
+    except Exception as e:
+        print(f"Error processing MOL2 file {mol2_outfile}: {e}")
+        raise
+
+def _clean_mol2_format(mol2_file):
+    """
+    清理mol2格式：移除转义符、多余空白、非标准区块，仅保留正规Tripos区块
+    """
+    valid_blocks = {'@<TRIPOS>MOLECULE', '@<TRIPOS>ATOM', '@<TRIPOS>BOND', '@<TRIPOS>SUBSTRUCTURE'}
+    output = []
+    keep = False
+    try:
+        with open(mol2_file, 'r') as f:
+            for line in f:
+                line = line.replace('\\n', '').replace('\\t', '')
+                line = line.rstrip('\n').rstrip('\r')
+                if line.startswith('@<TRIPOS>'):
+                    keep = line in valid_blocks
+                    if keep:
+                        output.append(line)
+                    continue
+                if keep:
+                    if line.strip():
+                        # 保证所有分隔符为单空格
+                        split_line = line.split()
+                        output.append(' '.join(split_line))
+        # 写回
+        with open(mol2_file, 'w') as f:
+            f.write('\n'.join(output) + '\n')
+    except Exception as e:
+        print(f"Error cleaning MOL2 format: {e}")
+
+def add_substructure_section(mol2_file):
+    """
+    补全/修正SUBSTRUCTURE区块（如果已经存在则不重复添加）
+    """
+    with open(mol2_file, 'r') as f:
+        content = f.read()
+    if '@<TRIPOS>SUBSTRUCTURE' not in content:
+        with open(mol2_file, 'a') as f:
+            f.write('@<TRIPOS>SUBSTRUCTURE\n')
+            f.write('1 UNK 1 GROUP **** **** 0 ROOT\n')
+
+
+def sdf_to_mol2(sdf_file, mol2_outfile):
+    """
+    Convert SDF file to MOL2 format using OpenBabel with format cleaning
+    """
+    try:
+        from openbabel import openbabel
+
+        obConversion = openbabel.OBConversion()
+        obConversion.SetInAndOutFormats("sdf", "mol2")
+
+        obmol = openbabel.OBMol()
+        if not obConversion.ReadFile(obmol, sdf_file):
+            print(f"Failed to read SDF file: {sdf_file}")
+            return False
+
+        if not obConversion.WriteFile(obmol, mol2_outfile):
+            print(f"Failed to write MOL2 file: {mol2_outfile}")
+            return False
+
+        # 清理格式
+        _clean_mol2_format(mol2_outfile)
+        # 补全substructure
+        add_substructure_section(mol2_outfile)
+        # 修正键类型/原子类型
+        amide_to_single_bond(mol2_outfile)
+        # *** 保证原子名唯一 ***
+        fix_atom_names(mol2_outfile)
+
+        print(f"[OK] SDF to MOL2 conversion and cleaning done: {mol2_outfile}")
+        return True
+
+    except Exception as e:
+        print(f"Error during SDF to MOL2 conversion: {e}")
+        return False
+
+def fix_atom_names(mol2_path):
+    """
+    保证mol2文件ATOM区块每个原子名字唯一（如C1、C2、O1、H3...），避免pdb2pqr等工具报重复名。
+    """
+    new_lines = []
+    atom_idx = {}
+    in_atom = False
+    with open(mol2_path, 'r') as f:
+        for line in f:
+            if line.startswith('@<TRIPOS>ATOM'):
+                in_atom = True
+                new_lines.append(line.rstrip())
                 continue
+            elif line.startswith('@<TRIPOS>'):
+                in_atom = False
+                new_lines.append(line.rstrip())
+                continue
+            if in_atom and line.strip():
+                parts = line.split()
+                if len(parts) >= 2:
+                    base = parts[1]
+                    idx = atom_idx.get(base, 0) + 1
+                    atom_idx[base] = idx
+                    parts[1] = f"{base}{idx}"
+                    line = ' '.join(parts)
+            new_lines.append(line.rstrip())
+    with open(mol2_path, 'w') as f:
+        f.write('\n'.join(new_lines) + '\n')
+    print(f"[OK] Atom names fixed in {mol2_path}")
 
-            if bond_record:
-                # 解析BOND行，格式: bond_id origin_atom_id target_atom_id bond_type
-                bond_id, origin_atom_id, target_atom_id, bond_type = line.split()
-                # 如果是amide键，将其类型设为单键（1）
-                bond_type = '1' if bond_type == 'am' else bond_type
-                # 重新拼接行
-                line = '\t'.join([bond_id, origin_atom_id, target_atom_id, bond_type])
-
-            mol2_new.append(line)
-
-    # 覆盖写回修改后的mol2文件
-    with open(mol2_outfile, 'w') as f:
-        f.write("\n".join(mol2_new))
-
-def sdf_to_mol2(sdf_file, mol2_outfile):  
-    """  
-    Convert SDF file to MOL2 format using OpenBabel and add required SUBSTRUCTURE section  
-      
-    Args:  
-        sdf_file: Path to input SDF file  
-        mol2_outfile: Path to output MOL2 file  
-      
-    Returns:  
-        bool: True if conversion successful, False otherwise  
-    """  
-    try:  
-        from openbabel import openbabel  
-          
-        obConversion = openbabel.OBConversion()  
-        obConversion.SetInAndOutFormats("sdf", "mol2")  
-          
-        obmol = openbabel.OBMol()  
-        if not obConversion.ReadFile(obmol, sdf_file):  
-            print(f"Failed to read SDF file: {sdf_file}")  
-            return False  
-              
-        if not obConversion.WriteFile(obmol, mol2_outfile):  
-            print(f"Failed to write MOL2 file: {mol2_outfile}")  
-            return False  
-          
-        # Add the missing @<TRIPOS>SUBSTRUCTURE section  
-        add_substructure_section(mol2_outfile)  
-          
-        # Apply the same amide bond fix as in the original code  
-        from triangulation.ligand_utils import amide_to_single_bond  
-        amide_to_single_bond(mol2_outfile)  
-          
-        return True  
-          
-    except Exception as e:  
-        print(f"Error during SDF to MOL2 conversion: {e}")  
-        return False  
-  
-def add_substructure_section(mol2_file):  
-    """  
-    Add @<TRIPOS>SUBSTRUCTURE section to MOL2 file if missing  
-    """  
-    try:  
-        with open(mol2_file, 'r') as f:  
-            content = f.read()  
-          
-        # Check if SUBSTRUCTURE section already exists  
-        if '@<TRIPOS>SUBSTRUCTURE' in content:  
-            return  
-          
-        # Add the SUBSTRUCTURE section at the end  
-        substructure_section = "\n@<TRIPOS>SUBSTRUCTURE\n1\tUNK\t1\tGROUP\t1 X\tUNK\n"  
-          
-        with open(mol2_file, 'w') as f:  
-            f.write(content + substructure_section)  
-              
-        print(f"Added @<TRIPOS>SUBSTRUCTURE section to {mol2_file}")  
-          
-    except Exception as e:  
-        print(f"Error adding SUBSTRUCTURE section: {e}")
-    
 def extract_ligand(ligand_sdf_file="ligand.sdf"):  
     """  
     直接从SDF文件中提取配体分子  

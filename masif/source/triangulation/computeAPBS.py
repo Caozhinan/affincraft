@@ -22,13 +22,16 @@ def computeAPBS(vertices, pdb_file, tmp_file_base, mol2_file=None):
     directory = "/".join(fields) + "/"
     filename_base = tmp_file_base.split("/")[-1]
     pdbname = pdb_file.split("/")[-1]
-    args = [
-        pdb2pqr_bin, pdbname, filename_base,
-        "--ff=PARSE",
-        "--whitespace",
-        "--noopt",
-        "--apbs-input",
-    ]
+    args = [  
+    pdb2pqr_bin, pdbname, filename_base,  
+    "--ff=PARSE",  
+    "--whitespace",  
+    "--noopt",  
+    "--nodebump",  
+    "--assign-only",   
+    "--chain",  
+    "--apbs-input",  
+]
     if mol2_file is not None:
         args.append("--ligand=" + mol2_file)
     p2 = Popen(args, stdout=PIPE, stderr=PIPE, cwd=directory)

@@ -17,13 +17,14 @@ import pymesh
 from input_output.extractPDB import extractPDB  
 from input_output.save_ply import save_ply  
 from input_output.read_ply import read_ply  
-from input_output.protonate import protonate  
+from input_output.protonate import protonate , fix_ligand_atom_names
 from triangulation.computeHydrophobicity import computeHydrophobicity  
 from triangulation.computeCharges import computeCharges, assignChargesToNewMesh  
 from triangulation.computeAPBS import computeAPBS  
 from triangulation.compute_normal import compute_normal  
 from sklearn.neighbors import KDTree  
-  
+
+
 def compute_protein_ligand_surface_features(pdb_file, chain_id, ligand_code=None, ligand_chain=None, sdf_file=None, mol2_patch=None, output_dir=None):  
     """  
     完整的蛋白质-配体表面特征计算流程  
@@ -54,7 +55,7 @@ def compute_protein_ligand_surface_features(pdb_file, chain_id, ligand_code=None
     protonated_file = tmp_dir + "/" + pdb_id + "_protonated.pdb"  
     print("质子化PDB文件...")  
     protonate(pdb_file, protonated_file)  
-      
+    fix_ligand_atom_names(protonated_file) 
     # 3. 提取指定链  
     out_filename = tmp_dir + "/" + pdb_id + "_" + chain_id  
     print(f"提取链 {chain_id}...")  

@@ -150,77 +150,93 @@ class AffinCraftAttnBias(nn.Module):
             module.weight.data.normal_(mean=0.0, std=0.02)  
       
     def forward(self, batched_data):  
-        edge_feat = batched_data["edge_feat"]  # [n_graph, n_edge, 4]  
-        edge_index = batched_data["edge_index"]  # [n_graph, 2, n_edge]  
-        num_ligand_atoms = batched_data["num_ligand_atoms"]  # [n_graph]  
-        attn_bias = batched_data.get("attn_bias")  # 基础注意力偏置  
+        edge_feat = batched_data["edge_feat"]  # [n_graph, max_edge_num, 4]  
+        edge_index = batched_data["edge_index"]  # [n_graph, 2, max_edge_num]  
+        edge_mask = batched_data.get("edge_mask")  # [n_graph, max_edge_num]  
+        num_ligand_atoms = batched_data["num_ligand_atoms"]  
+        attn_bias = batched_data.get("attn_bias")  
           
-        n_graph, n_edge, _ = edge_feat.size()  
+        n_graph, max_edge_num, _ = edge_feat.size()  
         n_node = batched_data["node_feat"].size(1)  
-          
+
         # 初始化注意力偏置矩阵  
         if attn_bias is None:  
             attn_bias = torch.zeros([n_graph, n_node + 1, n_node + 1], dtype=torch.float, device=edge_feat.device)  
-          
+
         graph_attn_bias = attn_bias.unsqueeze(1).repeat(1, self.num_heads, 1, 1)  
-          
+
         # 分离边类型编码和距离  
-        edge_types = edge_feat[:, :, :3].long()  # [n_graph, n_edge, 3]  
-        distances = edge_feat[:, :, 3:4]         # [n_graph, n_edge, 1]  
-          
+        edge_types = edge_feat[:, :, :3].long()  # [n_graph, max_edge_num, 3]  
+        distances = edge_feat[:, :, 3:4]         # [n_graph, max_edge_num, 1]  
+
         # 为每条边分类位置类型和相互作用类型  
         edge_embeddings = self._classify_and_embed_edges(  
-            edge_index, edge_types, distances, num_ligand_atoms  
-        )  # [n_graph, n_edge, num_heads]  
-          
-        # 将边embedding应用到注意力偏置矩阵  
+            edge_index, edge_types, distances, num_ligand_atoms, edge_mask  
+        )  # [n_graph, max_edge_num, num_heads]  
+
+        # 将边embedding应用到注意力偏置矩阵（只处理真实边）  
         for batch_idx in range(n_graph):  
-            for edge_idx in range(n_edge):  
-                src_idx = edge_index[batch_idx, 0, edge_idx] + 1  # +1 因为图token在位置0  
+            for edge_idx in range(max_edge_num):  
+                # 检查边掩码，只处理真实边  
+                if edge_mask is not None and not edge_mask[batch_idx, edge_idx]:  
+                    continue  
+
+                src_idx = edge_index[batch_idx, 0, edge_idx] + 1  
                 tgt_idx = edge_index[batch_idx, 1, edge_idx] + 1  
-                  
-                if src_idx < n_node + 1 and tgt_idx < n_node + 1:  
+
+                # 确保索引有效且不是padding边  
+                if (src_idx < n_node + 1 and tgt_idx < n_node + 1 and   
+                    src_idx > 0 and tgt_idx > 0):  # 避免指向padding节点  
                     graph_attn_bias[batch_idx, :, src_idx, tgt_idx] += edge_embeddings[batch_idx, edge_idx]  
-                    graph_attn_bias[batch_idx, :, tgt_idx, src_idx] += edge_embeddings[batch_idx, edge_idx]  # 对称  
-          
+                    graph_attn_bias[batch_idx, :, tgt_idx, src_idx] += edge_embeddings[batch_idx, edge_idx]  
+
         # 添加图token虚拟距离  
         t = self.graph_token_virtual_distance.weight.view(1, self.num_heads, 1)  
         graph_attn_bias[:, :, 1:, 0] += t  
         graph_attn_bias[:, :, 0, :] += t  
-          
+
         return graph_attn_bias  
       
-    def _classify_and_embed_edges(self, edge_index, edge_types, distances, num_ligand_atoms):  
+    def _classify_and_embed_edges(self, edge_index, edge_types, distances, num_ligand_atoms, edge_mask=None):  
         """分类边并生成对应的embedding"""  
-        n_graph, n_edge, _ = edge_types.size()  
-        edge_embeddings = torch.zeros(n_graph, n_edge, self.num_heads, device=edge_types.device)  
-          
+        n_graph, max_edge_num, _ = edge_types.size()  
+        edge_embeddings = torch.zeros(n_graph, max_edge_num, self.num_heads, device=edge_types.device)  
+
         for batch_idx in range(n_graph):  
             num_lig = num_ligand_atoms[batch_idx].item()  
-              
-            for edge_idx in range(n_edge):  
+
+            for edge_idx in range(max_edge_num):  
+                # 检查边掩码，只处理真实边  
+                if edge_mask is not None and not edge_mask[batch_idx, edge_idx]:  
+                    continue  
+
                 src_idx = edge_index[batch_idx, 0, edge_idx].item()  
                 tgt_idx = edge_index[batch_idx, 1, edge_idx].item()  
+
+                # 确保边索引有效，避免处理padding边  
+                if src_idx == 0 and tgt_idx == 0:  # padding边的标识  
+                    continue  
+
                 edge_type_code = edge_types[batch_idx, edge_idx]  # [3]  
                 distance = distances[batch_idx, edge_idx]  # [1]  
-                  
+
                 # 判断边的位置类型  
                 src_is_ligand = src_idx < num_lig  
                 tgt_is_ligand = tgt_idx < num_lig  
-                  
+
                 # 距离编码  
                 distance_emb = self.distance_encoder(distance.float())  
-                  
+
                 # 根据边类型编码和位置选择合适的embedding  
                 if edge_type_code[0] in [0, 1]:  # 结构边（共价键）  
                     # 将3维编码转换为单一索引  
                     edge_type_idx = edge_type_code[0] * 4 + edge_type_code[1] * 2 + edge_type_code[2]  
                     type_emb = self.structural_edge_encoder(edge_type_idx)  
-                      
+
                 elif edge_type_code[0] == 5:  # PLIP相互作用边  
                     # PLIP类型索引 (5,1,0) -> 1, (5,2,0) -> 2, etc.  
                     plip_type_idx = edge_type_code[1]  
-                      
+
                     if src_is_ligand and tgt_is_ligand:  
                         # 配体内部空间边  
                         type_emb = self.plip_intra_ligand_encoder(plip_type_idx)  
@@ -233,15 +249,15 @@ class AffinCraftAttnBias(nn.Module):
                         # 蛋白-配体相互作用边  
                         type_emb = self.plip_inter_molecular_encoder(plip_type_idx)  
                         location_emb = self.edge_location_encoder(torch.tensor(2, device=edge_types.device))  
-                      
+
                     type_emb = type_emb + location_emb  
-                      
+
                 else:  # 其他类型边  
                     type_emb = torch.zeros(self.num_heads, device=edge_types.device)  
-                  
+
                 # 组合类型embedding和距离embedding  
                 edge_embeddings[batch_idx, edge_idx] = type_emb + distance_emb  
-          
+
         return edge_embeddings
 
 def preprocess_affincraft_item(pkl_data):  

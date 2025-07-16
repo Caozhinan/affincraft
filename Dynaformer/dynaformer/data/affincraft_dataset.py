@@ -93,11 +93,13 @@ def affincraft_collator(items, max_node=512):
         return None  
       
     max_node_num = max(item['node_feat'].size(0) for item in items)  
+    max_edge_num = max(item['edge_feat'].size(0) for item in items)  # 新增：计算最大边数  
       
-    # 批处理节点特征  
+    # 批处理特征  
     node_feats = []  
     edge_feats = []  
     edge_indices = []  
+    edge_masks = []  # 新增：边掩码  
     coords_list = []  
     attn_biases = []  
     in_degrees = []  
@@ -105,23 +107,37 @@ def affincraft_collator(items, max_node=512):
       
     for item in items:  
         n_node = item['node_feat'].size(0)  
+        n_edge = item['edge_feat'].size(0)  
           
         # 填充节点特征  
         padded_node_feat = torch.zeros(max_node_num, item['node_feat'].size(1))  
         padded_node_feat[:n_node] = item['node_feat']  
         node_feats.append(padded_node_feat)  
           
-        # 填充坐标  
+        # 填充边特征 - 关键修改  
+        padded_edge_feat = torch.zeros(max_edge_num, item['edge_feat'].size(1))  
+        padded_edge_feat[:n_edge] = item['edge_feat']  
+        edge_feats.append(padded_edge_feat)  
+          
+        # 填充边索引  
+        padded_edge_index = torch.zeros(2, max_edge_num, dtype=torch.long)  
+        padded_edge_index[:, :n_edge] = item['edge_index']  
+        edge_indices.append(padded_edge_index)  
+          
+        # 创建边掩码  
+        edge_mask = torch.zeros(max_edge_num, dtype=torch.bool)  
+        edge_mask[:n_edge] = True  
+        edge_masks.append(edge_mask)  
+          
+        # 其他特征处理保持不变  
         padded_coords = torch.zeros(max_node_num, 3)  
         padded_coords[:n_node] = item['coords']  
         coords_list.append(padded_coords)  
           
-        # 填充注意力偏置  
         padded_attn_bias = torch.zeros(max_node_num + 1, max_node_num + 1)  
         padded_attn_bias[:n_node+1, :n_node+1] = item['attn_bias']  
         attn_biases.append(padded_attn_bias)  
           
-        # 填充度数信息  
         padded_in_degree = torch.zeros(max_node_num, dtype=torch.long)  
         padded_in_degree[:n_node] = item['in_degree']  
         in_degrees.append(padded_in_degree)  
@@ -129,14 +145,12 @@ def affincraft_collator(items, max_node=512):
         padded_out_degree = torch.zeros(max_node_num, dtype=torch.long)  
         padded_out_degree[:n_node] = item['out_degree']  
         out_degrees.append(padded_out_degree)  
-          
-        edge_feats.append(item['edge_feat'])  
-        edge_indices.append(item['edge_index'])  
       
     return {  
         'node_feat': torch.stack(node_feats),  
-        'edge_feat': edge_feats,  # 保持列表形式，因为边数可能不同  
-        'edge_index': edge_indices,  
+        'edge_feat': torch.stack(edge_feats),  # 改为tensor  
+        'edge_index': torch.stack(edge_indices),  # 改为tensor  
+        'edge_mask': torch.stack(edge_masks),  # 新增边掩码  
         'coords': torch.stack(coords_list),  
         'attn_bias': torch.stack(attn_biases),  
         'in_degree': torch.stack(in_degrees),  
